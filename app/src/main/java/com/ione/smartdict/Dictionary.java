@@ -16,5 +16,6 @@ public class Dictionary {
     public String getDefinition() {
         return definition;
     }
+
 }
 

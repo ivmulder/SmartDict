@@ -37,4 +37,5 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
     implementation 'com.google.android.material:material:1.8.0'
     implementation 'androidx.webkit:webkit:1.6.1'
+    implementation files('libs/dsl4j-0.5.3.jar')
 }

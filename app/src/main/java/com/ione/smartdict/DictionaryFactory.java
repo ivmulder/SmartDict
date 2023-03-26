@@ -1,8 +1,10 @@
 package com.ione.smartdict;
 
+import java.io.IOException;
+
 public class DictionaryFactory {
 
-    public static Dsl4jDictionary getDictionary(String dictionaryType, String filePath) {
+    public static Dsl4jDictionary getDictionary(String dictionaryType, String filePath) throws IOException {
         if (dictionaryType == null) {
             return null;
         }

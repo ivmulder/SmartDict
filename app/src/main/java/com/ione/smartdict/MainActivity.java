@@ -6,6 +6,7 @@ import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
@@ -48,6 +49,7 @@ import java.util.List;
 import java.util.Objects;
 
 public class MainActivity extends AppCompatActivity {
+    private static final int REQUEST_FOLDER_ACCESS = 101;
     private static final int REQUEST_READ_STORAGE = 100;
     private static final int REQUEST_MANAGE_EXTERNAL_STORAGE = 101;
     private DrawerLayout drawerLayout;
@@ -123,33 +125,34 @@ public class MainActivity extends AppCompatActivity {
         adapter = new DictionaryAdapter();
         recyclerView.setAdapter(adapter);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-                Uri uri = Uri.fromParts("package", getPackageName(), null);
-                intent.setData(uri);
-                startActivityForResult(intent, REQUEST_MANAGE_EXTERNAL_STORAGE);
-            } else {
-                loadDictionaries();
-            }
-        } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_READ_STORAGE);
-        } else {
-            loadDictionaries();
-        }
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+//            requestFolderAccess();
+//        } else {
+//            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+//                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_READ_STORAGE);
+//            } else {
+//                loadDictionaries();
+//            }
+//        }
+        requestFolderAccess();
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_READ_STORAGE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                loadDictionaries();
-            } else {
-                Toast.makeText(this, "Permission denied. Cannot load dictionaries.", Toast.LENGTH_SHORT).show();
-            }
-        }
+    private void requestFolderAccess() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        startActivityForResult(intent, REQUEST_READ_STORAGE);
     }
+
+//    @Override
+//    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+//        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+//        if (requestCode == REQUEST_READ_STORAGE) {
+//            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+//                loadDictionaries();
+//            } else {
+//                Toast.makeText(this, "Permission denied. Cannot load dictionaries.", Toast.LENGTH_SHORT).show();
+//            }
+//        }
+//    }
 
 //    private void loadDictionaries() {
 //        try {
@@ -184,23 +187,19 @@ public class MainActivity extends AppCompatActivity {
 //        }
 //    }
 
-    private void loadDictionaries() {
-        File smartDictFolder = new File(Environment.getExternalStorageDirectory(), "SmartDict");
-        if (smartDictFolder.exists() && smartDictFolder.isDirectory()) {
-            File[] dictionaryFiles = smartDictFolder.listFiles((dir, name) -> {
-                String lowerName = name.toLowerCase();
-                return lowerName.endsWith(".dsl") || lowerName.endsWith(".dsl.dz");
-            });
-
-            if (dictionaryFiles != null) {
-                for (File dictionaryFile : dictionaryFiles) {
+    private void loadDictionaries(Uri folderUri) {
+        DocumentFile folder = DocumentFile.fromTreeUri(this, folderUri);
+        if (folder != null && folder.exists()) {
+            DocumentFile[] dictionaryFiles = folder.listFiles();
+            for (DocumentFile dictionaryFile : dictionaryFiles) {
+                String fileName = dictionaryFile.getName();
+                if (fileName != null && (fileName.toLowerCase().endsWith(".dsl") || fileName.toLowerCase().endsWith(".dsl.dz"))) {
                     try {
-                        Uri fileUri = FileProvider.getUriForFile(MainActivity.this, BuildConfig.APPLICATION_ID + ".fileprovider", dictionaryFile);
-                        InputStream inputStream = getContentResolver().openInputStream(fileUri);
+                        InputStream inputStream = getContentResolver().openInputStream(dictionaryFile.getUri());
                         if (inputStream != null) {
-                            String fileName = dictionaryFile.getName();
-                            Dictionary dictionary = new Dsl4jDictionary(inputStream, fileName);
-                            adapter.addDictionary(dictionary);
+                            Dsl4jDictionary dsl4jDictionary = new Dsl4jDictionary(inputStream, fileName);
+                            adapter.addDictionary(dsl4jDictionary);
+                            inputStream.close();
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -211,25 +210,26 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_READ_STORAGE && resultCode == RESULT_OK && data != null) {
-            Uri uri = data.getData();
-            if (uri != null) {
-                try {
-                    InputStream inputStream = getContentResolver().openInputStream(uri);
-                    if (inputStream != null) {
-                        String fileName = getFileNameFromUri(uri);
-                        Dsl4jDictionary dsl4jDictionary = new Dsl4jDictionary(inputStream, fileName);
-                        adapter.addDictionary(dsl4jDictionary);
-                        inputStream.close();
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_READ_STORAGE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                SharedPreferences sharedPreferences = getPreferences(Context.MODE_PRIVATE);
+                String folderUriString = sharedPreferences.getString("folder_uri", null);
+                if (folderUriString != null) {
+                    Uri folderUri = Uri.parse(folderUriString);
+                    loadDictionaries(folderUri);
                 }
+            } else {
+                Toast.makeText(this, "Permission denied. Cannot load dictionaries.", Toast.LENGTH_SHORT).show();
             }
         }
     }
+
+
+
 
     @SuppressLint("Range")
     private String getFileNameFromUri(Uri uri) {

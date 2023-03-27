@@ -1,4 +1,5 @@
 package com.ione.smartdict;
+
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -24,9 +25,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.textfield.TextInputEditText;
 
-
 import java.io.File;
-import java.util.Arrays;
+import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
@@ -35,6 +35,7 @@ public class MainActivity extends AppCompatActivity {
     private DrawerLayout drawerLayout;
     private TextInputEditText searchField;
     private DictionaryAdapter adapter;
+    private Dictionary dictionary;
 
     private void hideKeyboard() {
         InputMethodManager inputMethodManager = (InputMethodManager) getSystemService(Activity.INPUT_METHOD_SERVICE);
@@ -90,32 +91,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-
-//        searchField.setOnEditorActionListener(new TextView.OnEditorActionListener() {
-//            @Override
-//            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
-//                if (actionId == EditorInfo.IME_ACTION_DONE) {
-//                    searchField.clearFocus();
-//                    InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-//                    imm.hideSoftInputFromWindow(searchField.getWindowToken(), 0);
-//                    return true;
-//                }
-//                return false;
-//            }
-//        });
-
-//        searchField.setOnEditorActionListener((v, actionId, event) -> {
-//            if (actionId == EditorInfo.IME_ACTION_DONE) {
-//                if (v.getText().toString().isEmpty()) {
-//                    searchField.clearFocus();
-//                    hideKeyboard();
-//                    return true;
-//                }
-//            }
-//            return false;
-//        });
-
-
         searchField.setOnFocusChangeListener((v, hasFocus) -> {
             if (!hasFocus) {
                 if (((TextInputEditText) v).getText().toString().isEmpty()) {
@@ -127,8 +102,7 @@ public class MainActivity extends AppCompatActivity {
         RecyclerView recyclerView = findViewById(R.id.recycler_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
-        List<String> sampleDictionaryItems = Arrays.asList("Item 1", "Item 2", "Item 3", "Item 4", "Item 5");
-        adapter = new DictionaryAdapter(sampleDictionaryItems);
+        adapter = new DictionaryAdapter();
         recyclerView.setAdapter(adapter);
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
@@ -161,14 +135,15 @@ public class MainActivity extends AppCompatActivity {
             if (dictionaryFiles != null) {
                 for (File dictionaryFile : dictionaryFiles) {
                     String dictionaryFilePath = dictionaryFile.getAbsolutePath();
-                    String indexFilePath = dictionaryFilePath + ".idx";
-                    Dictionary dictionary = DictionaryFactory.createDictionary(dictionaryFilePath, indexFilePath);
-                    // Add the dictionary to the list of dictionaries, adapter, or any data structure you're using
+                    try {
+                        Dictionary dictionary = new Dsl4jDictionary(dictionaryFilePath);
+                        adapter.addDictionary(dictionary);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }
-    }
-
 }
-
+}
 

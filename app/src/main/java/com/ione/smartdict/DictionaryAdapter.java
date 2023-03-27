@@ -16,12 +16,18 @@ import java.util.List;
 
 public class DictionaryAdapter extends RecyclerView.Adapter<DictionaryAdapter.DictionaryViewHolder> implements Filterable {
 
-    private List<String> dictionaryItems;
-    private List<String> dictionaryItemsFiltered;
+    private List<Dictionary> dictionaries;
+    private List<Dictionary> dictionariesFiltered;
 
-    public DictionaryAdapter(List<String> dictionaryItems) {
-        this.dictionaryItems = dictionaryItems;
-        this.dictionaryItemsFiltered = new ArrayList<>(dictionaryItems);
+    public DictionaryAdapter() {
+        this.dictionaries = new ArrayList<>();
+        this.dictionariesFiltered = new ArrayList<>(dictionaries);
+    }
+
+    public void addDictionary(Dictionary dictionary) {
+        dictionaries.add(dictionary);
+        dictionariesFiltered.add(dictionary);
+        notifyDataSetChanged();
     }
 
     @NonNull
@@ -31,16 +37,16 @@ public class DictionaryAdapter extends RecyclerView.Adapter<DictionaryAdapter.Di
         return new DictionaryViewHolder(view);
     }
 
-
     @Override
     public void onBindViewHolder(@NonNull DictionaryViewHolder holder, int position) {
-        String item = dictionaryItemsFiltered.get(position);
-        holder.itemTextView.setText(item);
+        Dictionary dictionary = dictionariesFiltered.get(position);
+        String dictionaryName = dictionary.getDictionaryName();
+        holder.itemTextView.setText(dictionaryName);
     }
 
     @Override
     public int getItemCount() {
-        return dictionaryItemsFiltered.size();
+        return dictionariesFiltered.size();
     }
 
     public static class DictionaryViewHolder extends RecyclerView.ViewHolder {
@@ -51,7 +57,6 @@ public class DictionaryAdapter extends RecyclerView.Adapter<DictionaryAdapter.Di
             super(itemView);
             itemTextView = itemView.findViewById(R.id.item_text_view);
         }
-
     }
 
     @Override
@@ -60,14 +65,14 @@ public class DictionaryAdapter extends RecyclerView.Adapter<DictionaryAdapter.Di
             @Override
             protected FilterResults performFiltering(CharSequence constraint) {
                 String filterString = constraint.toString().toLowerCase().trim();
-                List<String> filteredList = new ArrayList<>();
+                List<Dictionary> filteredList = new ArrayList<>();
 
                 if (filterString.isEmpty()) {
-                    filteredList.addAll(dictionaryItems);
+                    filteredList.addAll(dictionaries);
                 } else {
-                    for (String item : dictionaryItems) {
-                        if (item.toLowerCase().contains(filterString)) {
-                            filteredList.add(item);
+                    for (Dictionary dictionary : dictionaries) {
+                        if (dictionary.getDictionaryName().toLowerCase().contains(filterString)) {
+                            filteredList.add(dictionary);
                         }
                     }
                 }
@@ -80,10 +85,11 @@ public class DictionaryAdapter extends RecyclerView.Adapter<DictionaryAdapter.Di
             @SuppressWarnings("unchecked")
             @Override
             protected void publishResults(CharSequence constraint, FilterResults results) {
-                dictionaryItemsFiltered.clear();
-                dictionaryItemsFiltered.addAll((List<String>) results.values);
+                dictionariesFiltered.clear();
+                dictionariesFiltered.addAll((List<Dictionary>) results.values);
                 notifyDataSetChanged();
             }
         };
     }
 }
+

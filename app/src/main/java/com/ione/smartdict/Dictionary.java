@@ -4,4 +4,5 @@ import java.io.IOException;
 
 public interface Dictionary {
     String search(String word) throws IOException;
+    String getDictionaryName();
 }

@@ -13,12 +13,14 @@ import java.util.Map;
 public class Dsl4jDictionary implements Dictionary {
     private DslDictionary dslDictionary;
     private HtmlDslVisitor htmlDslVisitor;
+    private String dictionaryName;
 
     public Dsl4jDictionary(String dictionaryPath) throws IOException {
         Path path = Paths.get(dictionaryPath);
         Path indexPath = Paths.get(dictionaryPath + ".idx");
         dslDictionary = DslDictionary.loadDictionary(path, indexPath);
         htmlDslVisitor = new HtmlDslVisitor(path.getParent().toString());
+        dictionaryName = new File(dictionaryPath).getName();
     }
 
     @Override
@@ -30,5 +32,10 @@ public class Dsl4jDictionary implements Dictionary {
             result.append("<p><strong>").append(key).append("</strong>").append(article).append("</p>");
         }
         return result.toString();
+    }
+
+    @Override
+    public String getDictionaryName() {
+        return dictionaryName;
     }
 }

@@ -3,9 +3,13 @@ package com.ione.smartdict;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.MotionEvent;
@@ -14,6 +18,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
@@ -32,6 +37,7 @@ import java.util.Objects;
 
 public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_READ_STORAGE = 100;
+    private static final int REQUEST_MANAGE_EXTERNAL_STORAGE = 101;
     private DrawerLayout drawerLayout;
     private TextInputEditText searchField;
     private DictionaryAdapter adapter;
@@ -105,7 +111,16 @@ public class MainActivity extends AppCompatActivity {
         adapter = new DictionaryAdapter();
         recyclerView.setAdapter(adapter);
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                Uri uri = Uri.fromParts("package", getPackageName(), null);
+                intent.setData(uri);
+                startActivityForResult(intent, REQUEST_MANAGE_EXTERNAL_STORAGE);
+            } else {
+                loadDictionaries();
+            }
+        } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_READ_STORAGE);
         } else {
             loadDictionaries();
@@ -120,6 +135,21 @@ public class MainActivity extends AppCompatActivity {
                 loadDictionaries();
             } else {
                 Toast.makeText(this, "Permission denied. Cannot load dictionaries.", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == REQUEST_MANAGE_EXTERNAL_STORAGE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                if (Environment.isExternalStorageManager()) {
+                    loadDictionaries();
+                } else {
+                    Toast.makeText(this, "Permission denied. Cannot load dictionaries.", Toast.LENGTH_SHORT).show();
+                }
             }
         }
     }
@@ -146,4 +176,5 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 }
+
 

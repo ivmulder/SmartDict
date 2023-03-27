@@ -3,15 +3,21 @@ package com.ione.smartdict;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.ContentResolver;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.DocumentsContract;
+import android.provider.OpenableColumns;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
@@ -23,15 +29,21 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 import androidx.core.view.GravityCompat;
+import androidx.documentfile.provider.DocumentFile;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.textfield.TextInputEditText;
+import com.ione.smartdict.Dictionary;
+import com.ione.smartdict.DictionaryAdapter;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -139,20 +151,38 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == REQUEST_MANAGE_EXTERNAL_STORAGE) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                if (Environment.isExternalStorageManager()) {
-                    loadDictionaries();
-                } else {
-                    Toast.makeText(this, "Permission denied. Cannot load dictionaries.", Toast.LENGTH_SHORT).show();
-                }
-            }
-        }
-    }
+//    private void loadDictionaries() {
+//        try {
+//            Uri smartDictUri = FileProvider.getUriForFile(this, BuildConfig.APPLICATION_ID + ".fileprovider", new File(Environment.getExternalStorageDirectory(), "SmartDict"));
+//            List<Uri> dictionaryUris = new ArrayList<>();
+//
+//            DocumentFile documentFile = DocumentFile.fromTreeUri(this, smartDictUri);
+//            if (documentFile != null) {
+//                DocumentFile[] documentFiles = documentFile.listFiles();
+//
+//                for (DocumentFile file : documentFiles) {
+//                    String fileName = file.getName();
+//                    if (fileName != null && (fileName.toLowerCase().endsWith(".dsl") || fileName.toLowerCase().endsWith(".dsl.dz"))) {
+//                        dictionaryUris.add(file.getUri());
+//                    }
+//                }
+//            }
+//
+//            for (Uri dictionaryUri : dictionaryUris) {
+//                InputStream inputStream = getContentResolver().openInputStream(dictionaryUri);
+//                if (inputStream != null) {
+//                    String dictionaryName = DocumentFile.fromSingleUri(this, dictionaryUri).getName();
+//                    if (dictionaryName != null) {
+//                        Dictionary dictionary = new Dsl4jDictionary(inputStream, dictionaryName);
+//                        adapter.addDictionary(dictionary);
+//                        inputStream.close();
+//                    }
+//                }
+//            }
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//    }
 
     private void loadDictionaries() {
         File smartDictFolder = new File(Environment.getExternalStorageDirectory(), "SmartDict");
@@ -164,10 +194,14 @@ public class MainActivity extends AppCompatActivity {
 
             if (dictionaryFiles != null) {
                 for (File dictionaryFile : dictionaryFiles) {
-                    String dictionaryFilePath = dictionaryFile.getAbsolutePath();
                     try {
-                        Dictionary dictionary = new Dsl4jDictionary(dictionaryFilePath);
-                        adapter.addDictionary(dictionary);
+                        Uri fileUri = FileProvider.getUriForFile(MainActivity.this, BuildConfig.APPLICATION_ID + ".fileprovider", dictionaryFile);
+                        InputStream inputStream = getContentResolver().openInputStream(fileUri);
+                        if (inputStream != null) {
+                            String fileName = dictionaryFile.getName();
+                            Dictionary dictionary = new Dsl4jDictionary(inputStream, fileName);
+                            adapter.addDictionary(dictionary);
+                        }
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -175,6 +209,44 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
+
+
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_READ_STORAGE && resultCode == RESULT_OK && data != null) {
+            Uri uri = data.getData();
+            if (uri != null) {
+                try {
+                    InputStream inputStream = getContentResolver().openInputStream(uri);
+                    if (inputStream != null) {
+                        String fileName = getFileNameFromUri(uri);
+                        Dsl4jDictionary dsl4jDictionary = new Dsl4jDictionary(inputStream, fileName);
+                        adapter.addDictionary(dsl4jDictionary);
+                        inputStream.close();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    @SuppressLint("Range")
+    private String getFileNameFromUri(Uri uri) {
+        String displayName = "unknown_dictionary.dsl";
+        Cursor cursor = getContentResolver().query(uri, null, null, null, null);
+        if (cursor != null) {
+            try {
+                if (cursor.moveToFirst()) {
+                    displayName = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+        return displayName;
+    }
+
 }
 
 

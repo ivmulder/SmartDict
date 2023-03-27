@@ -1,19 +1,30 @@
 package com.ione.smartdict;
 
+import android.content.Context;
+import android.net.Uri;
+
+import androidx.core.content.FileProvider;
+
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 
 public class DictionaryFactory {
 
-    public static Dsl4jDictionary getDictionary(String dictionaryType, String filePath) throws IOException {
-        if (dictionaryType == null) {
-            return null;
+    public static Dictionary createDictionary(Context context, String filePath) {
+        try {
+            Uri fileUri = FileProvider.getUriForFile(context, BuildConfig.APPLICATION_ID + ".fileprovider", new File(filePath));
+            InputStream inputStream = context.getContentResolver().openInputStream(fileUri);
+            if (inputStream != null) {
+                String fileName = new File(filePath).getName();
+                return new Dsl4jDictionary(inputStream, fileName);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        if (dictionaryType.equalsIgnoreCase("DSL")) {
-            return new Dsl4jDictionary(filePath);
-        }
-        // Add other dictionary types here
         return null;
     }
+
 
 
     private static String getFileExtension(String filePath) {

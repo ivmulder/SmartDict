@@ -37,5 +37,12 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
     implementation 'com.google.android.material:material:1.8.0'
     implementation 'androidx.webkit:webkit:1.6.1'
+    implementation 'commons-io:commons-io:2.11.0'
+    implementation 'io.github.dictzip:dictzip:0.13.0'
+    implementation 'com.google.protobuf:protobuf-java:3.18.1'
+    implementation 'com.github.takawitter:trie4j:0.9.8'
+
+
+
     implementation files('libs/dsl4j-0.5.3.jar')
 }

@@ -3,57 +3,67 @@ package com.ione.smartdict;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Filter;
+import android.widget.Filterable;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import android.widget.Filter;
-import android.widget.Filterable;
-
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class DictionaryAdapter extends RecyclerView.Adapter<DictionaryAdapter.DictionaryViewHolder> implements Filterable {
+public class DictionaryAdapter extends RecyclerView.Adapter<DictionaryAdapter.WordViewHolder> implements Filterable {
 
-    private List<Dictionary> dictionaries;
-    private List<Dictionary> dictionariesFiltered;
+    private Dictionary dictionary;
+    private List<String> words;
+    private List<String> wordsFiltered;
 
     public DictionaryAdapter() {
-        this.dictionaries = new ArrayList<>();
-        this.dictionariesFiltered = new ArrayList<>(dictionaries);
+        this.words = new ArrayList<>();
+        this.wordsFiltered = new ArrayList<>(words);
+    }
+
+    public void setDictionary(Dictionary dictionary) {
+        this.dictionary = dictionary;
+        notifyDataSetChanged();
     }
 
     public void addDictionary(Dictionary dictionary) {
-        dictionaries.add(dictionary);
-        dictionariesFiltered.add(dictionary);
+        this.dictionary = dictionary;
+        notifyDataSetChanged();
+    }
+
+    public void setWords(List<String> words) {
+        this.words = words;
+        this.wordsFiltered = new ArrayList<>(words);
         notifyDataSetChanged();
     }
 
     @NonNull
     @Override
-    public DictionaryViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.dictionary_item, parent, false);
-        return new DictionaryViewHolder(view);
+    public WordViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.word_item, parent, false);
+        return new WordViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull DictionaryViewHolder holder, int position) {
-        Dictionary dictionary = dictionariesFiltered.get(position);
-        String dictionaryName = dictionary.getDictionaryName();
-        holder.itemTextView.setText(dictionaryName);
+    public void onBindViewHolder(@NonNull WordViewHolder holder, int position) {
+        String word = wordsFiltered.get(position);
+        holder.itemTextView.setText(word);
     }
 
     @Override
     public int getItemCount() {
-        return dictionariesFiltered.size();
+        return wordsFiltered.size();
     }
 
-    public static class DictionaryViewHolder extends RecyclerView.ViewHolder {
+    public static class WordViewHolder extends RecyclerView.ViewHolder {
 
         TextView itemTextView;
 
-        public DictionaryViewHolder(@NonNull View itemView) {
+        public WordViewHolder(@NonNull View itemView) {
             super(itemView);
             itemTextView = itemView.findViewById(R.id.item_text_view);
         }
@@ -65,15 +75,15 @@ public class DictionaryAdapter extends RecyclerView.Adapter<DictionaryAdapter.Di
             @Override
             protected FilterResults performFiltering(CharSequence constraint) {
                 String filterString = constraint.toString().toLowerCase().trim();
-                List<Dictionary> filteredList = new ArrayList<>();
+                List<String> filteredList = new ArrayList<>();
 
                 if (filterString.isEmpty()) {
-                    filteredList.addAll(dictionaries);
+                    filteredList.addAll(words);
                 } else {
-                    for (Dictionary dictionary : dictionaries) {
-                        if (dictionary.getDictionaryName().toLowerCase().contains(filterString)) {
-                            filteredList.add(dictionary);
-                        }
+                    try {
+                        filteredList = dictionary.search(filterString);
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
                 }
 
@@ -85,12 +95,11 @@ public class DictionaryAdapter extends RecyclerView.Adapter<DictionaryAdapter.Di
             @SuppressWarnings("unchecked")
             @Override
             protected void publishResults(CharSequence constraint, FilterResults results) {
-                dictionariesFiltered.clear();
-                dictionariesFiltered.addAll((List<Dictionary>) results.values);
+                wordsFiltered.clear();
+                wordsFiltered.addAll((List<String>) results.values);
                 notifyDataSetChanged();
             }
         };
     }
 }
-
 

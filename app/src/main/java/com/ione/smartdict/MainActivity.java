@@ -4,8 +4,6 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -13,6 +11,7 @@ import android.provider.OpenableColumns;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
@@ -29,6 +28,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.textfield.TextInputEditText;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
@@ -36,11 +36,9 @@ import java.util.Objects;
 public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_FOLDER_ACCESS = 101;
     private static final int REQUEST_READ_STORAGE = 100;
-    private static final int REQUEST_MANAGE_EXTERNAL_STORAGE = 101;
     private DrawerLayout drawerLayout;
     private TextInputEditText searchField;
     private DictionaryAdapter adapter;
-    private Dictionary dictionary;
 
     private void hideKeyboard() {
         InputMethodManager inputMethodManager = (InputMethodManager) getSystemService(Activity.INPUT_METHOD_SERVICE);
@@ -119,89 +117,63 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadDictionaries(Uri folderUri) {
-        Log.d("MainActivity", "loadDictionaries called with folderUri: " + folderUri.toString());
-
         DocumentFile folder = DocumentFile.fromTreeUri(this, folderUri);
         if (folder != null && folder.exists()) {
             DocumentFile[] dictionaryFiles = folder.listFiles();
-            Log.d("MainActivity", "Number of files in folder: " + dictionaryFiles.length);
-            for (DocumentFile dictionaryFile : dictionaryFiles) {
-                String fileName = dictionaryFile.getName();
-                if (fileName != null && (fileName.toLowerCase().endsWith(".dsl") || fileName.toLowerCase().endsWith(".dsl.dz"))) {
-                    Log.d("MainActivity", "Processing dictionary file: " + fileName);
+            for (DocumentFile file : dictionaryFiles) {
+                if (file.isFile() && file.getName() != null && (file.getName().toLowerCase().endsWith(".dsl") ||file.getName().toLowerCase().endsWith(".dsl.dz"))) {
+                    Log.d("MainActivity", "Processing file: " + file.getName());
                     try {
-                        InputStream inputStream = getContentResolver().openInputStream(dictionaryFile.getUri());
+                        String fileName = getFileName(this, file.getUri());
+                        InputStream inputStream = getContentResolver().openInputStream(file.getUri());
                         if (inputStream != null) {
-                            Dsl4jDictionary dsl4jDictionary = new Dsl4jDictionary(inputStream, fileName);
-                            adapter.addDictionary(dsl4jDictionary);
+                            Dictionary dictionary = new Dsl4jDictionary(inputStream, fileName);
+                            if (dictionary != null) {
+                                adapter.addDictionary(dictionary);
+                            }
                             inputStream.close();
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-                } else {
-                    Log.d("MainActivity", "Skipped non-dictionary file: " + fileName);
                 }
             }
+            adapter.notifyDataSetChanged();
         } else {
-            Log.d("MainActivity", "Folder not found or not accessible");
+            Toast.makeText(this, R.string.error_no_dictionary_files, Toast.LENGTH_SHORT).show();
         }
     }
 
 
-
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_READ_STORAGE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                SharedPreferences sharedPreferences = getPreferences(Context.MODE_PRIVATE);
-                String folderUriString = sharedPreferences.getString("folder_uri", null);
-                if (folderUriString != null) {
-                    Uri folderUri = Uri.parse(folderUriString);
-                    loadDictionaries(folderUri);
+    private String getFileName(@NonNull Context context, @NonNull Uri uri) {
+        String fileName = null;
+        try (Cursor cursor = context.getContentResolver().query(uri, null, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int columnIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (columnIndex >= 0) {
+                    fileName = cursor.getString(columnIndex);
                 }
-            } else {
-                Toast.makeText(this, "Permission denied. Cannot load dictionaries.", Toast.LENGTH_SHORT).show();
             }
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error getting file name", e);
         }
+        return fileName;
     }
 
-    @SuppressLint("Range")
-    private String getFileNameFromUri(Uri uri) {
-        String displayName = "unknown_dictionary.dsl";
-        Cursor cursor = getContentResolver().query(uri, null, null, null, null);
-        if (cursor != null) {
-            try {
-                if (cursor.moveToFirst()) {
-                    displayName = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
-                }
-            } finally {
-                cursor.close();
-            }
-        }
-        return displayName;
-    }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+
         if (requestCode == REQUEST_READ_STORAGE && resultCode == RESULT_OK && data != null) {
-            Uri uri = data.getData();
-            Log.d("MainActivity", "Folder selected: " + uri.toString());
-            if (uri != null) {
-                getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                SharedPreferences sharedPreferences = getPreferences(Context.MODE_PRIVATE);
-                SharedPreferences.Editor editor = sharedPreferences.edit();
-                editor.putString("folder_uri", uri.toString());
-                editor.apply();
-                loadDictionaries(uri);
-            }
+            Uri folderUri = data.getData();
+            getContentResolver().takePersistableUriPermission(folderUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+            loadDictionaries(folderUri);
+        } else if (requestCode == REQUEST_FOLDER_ACCESS && resultCode == RESULT_CANCELED) {
+            Toast.makeText(this, R.string.error_folder_access_required, Toast.LENGTH_LONG).show();
+            finish();
         }
     }
-
-
 }
-
-

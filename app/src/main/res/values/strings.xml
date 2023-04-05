@@ -2,4 +2,7 @@
     <string name="SmartDict">smartDic</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="error_no_dictionary_files">No dictionary files found</string>
+    <string name="error_folder_access_required">Folder access is required to use dictionaries</string>
+
 </resources>
